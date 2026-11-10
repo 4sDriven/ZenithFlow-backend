@@ -188,7 +188,8 @@ export async function fetchEpisode(pageUrl: string): Promise<EpisodeContent> {
     pageUrl
 
   const thumbnailUrl = html.match(/<meta property="og:image" content="([^"]+)"/)?.[1] ?? null
-  const audioUrl = html.match(/(https:\/\/downloads\.bbc\.co\.uk\/[^"']+\.mp3)/)?.[1] ?? null
+  // 注意：部分 TEWS 音频文件名含英文撇号（如 can't），不能把 ' 排除在 URL 字符集外
+  const audioUrl = html.match(/(https:\/\/downloads\.bbc\.co\.uk\/[^"]+?\.mp3)/)?.[1] ?? null
 
   return {
     title: stripTitlePrefix(decodeEntities(rawTitle).trim()),
