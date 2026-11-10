@@ -108,11 +108,24 @@ export function parseFeed(xml: string): FeedItem[] {
   return items
 }
 
+/**
+ * 文稿正文之后紧跟的是「Next / Vocabulary」标题、相关推荐、页脚导航与内联脚本。
+ * 旧实现只裁到 <footer>，导致最后一句会把整页剩余内容（含 BBCLECourseStructure
+ * 之类的内联 JSON/JS）一起吞进去。这里按第一个「正文之外」的结构块截断。
+ */
+const TRANSCRIPT_BODY_END_RE =
+  /<h[1-4][\s>]|<script[\s>]|<style[\s>]|<footer[\s>]|<div[^>]*class="[^"]*\bbbcle-footer|<p>\s*<strong[^>]*>\s*Next\s*<\/strong>\s*<\/p>/i
+
+function trimTranscriptBody(seg: string): string {
+  const end = seg.match(TRANSCRIPT_BODY_END_RE)
+  return end && end.index !== undefined ? seg.slice(0, end.index) : seg
+}
+
 export function parseTranscript(html: string): TranscriptTurn[] {
   const marker = html.match(/<strong[^>]*>\s*TRANSCRIPT\s*<\/strong>/i)
   if (!marker || marker.index === undefined) return []
 
-  let seg = html.slice(marker.index + marker[0].length)
+  let seg = trimTranscriptBody(html.slice(marker.index + marker[0].length))
   const footerIdx = seg.search(/<footer[\s>]/i)
   if (footerIdx >= 0) seg = seg.slice(0, footerIdx)
 
