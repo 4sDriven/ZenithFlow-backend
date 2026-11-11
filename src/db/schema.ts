@@ -216,3 +216,50 @@ export const biliAccounts = pgTable(
 )
 
 export type BiliAccount = typeof biliAccounts.$inferSelect
+
+/** 每日报纸：只保留最新一期，新一期成功后删除旧日期 */
+export const newspaperEditionStatusEnum = pgEnum('newspaper_edition_status', [
+  'generating',
+  'ready',
+  'failed',
+])
+
+export type NewspaperSectionKey = 'hangzhou' | 'benxi' | 'bili' | 'steam' | 'china' | 'world'
+export type NewspaperItemKind = 'official' | 'folk' | 'mixed'
+
+export type NewspaperItem = {
+  title: string
+  summary: string
+  source: string
+  url: string | null
+  publishedAt: string | null
+  publishedLabel: string | null
+  heat: string | null
+  kind: NewspaperItemKind
+  tags: string[]
+}
+
+export type NewspaperSection = {
+  key: NewspaperSectionKey
+  title: string
+  subtitle: string
+  intro: string
+  items: NewspaperItem[]
+  degraded: boolean
+  note: string | null
+}
+
+export const newspaperEditions = pgTable('newspaper_editions', {
+  id: serial('id').primaryKey(),
+  editionDate: date('edition_date').notNull().unique(),
+  status: newspaperEditionStatusEnum('status').notNull().default('generating'),
+  sections: jsonb('sections').$type<NewspaperSection[]>().notNull().default([]),
+  sourceStats: jsonb('source_stats').$type<Record<string, number>>().notNull().default({}),
+  itemCount: integer('item_count').notNull().default(0),
+  error: text('error'),
+  generatedAt: timestamp('generated_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export type NewspaperEditionRow = typeof newspaperEditions.$inferSelect

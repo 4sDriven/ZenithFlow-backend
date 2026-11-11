@@ -30,6 +30,7 @@ Node 20 + Fastify + TypeScript + Zod。
 | `/api/kb` | `routes/kb.ts` | 知识库 |
 | `/api/english` | `routes/english.ts` | 英语口语 |
 | `/api/bili` | `routes/bili.ts` | B站视频搜索、UP 主搜索 / 投稿、评论、子评论、讨论关系、点赞 / 回复、扫码登录绑定 |
+| `/api/newspaper` | `routes/newspaper.ts` | 每日报纸：今日一期、管理员手动重新生成 |
 
 ## 环境变量
 
@@ -47,6 +48,7 @@ PostgreSQL 12 + Drizzle ORM，连接在 `src/db/client.ts`，表定义在 `src/d
 - `knowledge_items` / `knowledge_chunks`：知识库条目与向量分块
 - `english_series` / `english_episodes` / `english_assignments`：英语素材与每日作业
 - `bili_accounts`：站点账号绑定的 B 站登录态（`user_id` 唯一），Cookie / refresh_token 用 AES-256-GCM 加密
+- `newspaper_editions`：每日报纸（`edition_date` 唯一、状态、六个版块 JSON、来源统计），只保留最新一期
 
 迁移与种子见 `src/db/`、`src/scripts/`。
 
@@ -77,6 +79,23 @@ PostgreSQL 12 + Drizzle ORM，连接在 `src/db/client.ts`，表定义在 `src/d
 - 写操作只在 412 / -412 / -352（请求未执行）时退避重试一次；网络超时等不确定结果**不重试**，避免重复发评论
 - `writeCodeToMessage()` 统一把 B 站错误码（-101/-111/12002/12015/12025/12051 等）翻译成中文；回复成功后 `invalidateBiliCommentCache(aid)` 清掉该视频的评论/子评论/页数/关系图缓存
 - 写接口只使用当前站点账号自己绑定的 B 站登录态，不接受前端传账号；未绑定返回 409，登录过期/凭据损坏返回 401
+
+## 日报模块（`lib/newspaper/`）
+
+- 入口：`scripts/newspaper-daily.ts`；定时 `zenithflow-newspaper-daily.timer` 每天 00:00（Asia/Shanghai）生成，成功后再删除旧日期，失败保留上一期
+- 版块固定顺序：杭州、辽宁本溪、B站吃瓜、Steam、中国、世界；采集器按版块输出 `RawItem`，AI 只能通过 `rawIds` 引用素材，链接/来源/时间从素材回填，避免编造 URL
+- 采集源：
+  - 民间热搜：百度、知乎、抖音、贴吧直连；微博走 NewsNow 公共聚合
+  - B站：热搜词、热门列表、争议关键词搜索（塌房/争议/回应/道歉/翻车/辟谣等）、候选视频评论区
+  - Steam：`featuredcategories`（热销/新品/特惠）、`appdetails`、`ISteamNews/GetNewsForApp`
+  - 新闻：360 资讯（按时间排序）、Bing News RSS、中国新闻网 RSS、BBC World RSS、NewsNow（澎湃/财联社/华尔街见闻/IT之家）
+  - 杭州本地：19楼首页与帮帮团版块热帖（GB18030）
+- 所有出站请求统一走 `http.ts` 的串行队列（220ms 间隔），单源失败只记入 `errors`，不阻塞整期
+- AI 编排：`qwen-plus`，每个版块一次调用；单版失败用原始素材降级（`degraded=true`）；摘要中素材没有的数字会被替换，整段英文会被替换为中文提示
+- `getNewspaperView()` 返回今日状态：优先今日 ready；今日失败/生成中时回退到最近一期 ready，并带 `stale/error` 标记
+- 生成并发：进程内 `running` 锁 + 数据库状态；`generating` 超过 30 分钟视为中断
+- 接口：`GET /api/newspaper/today`（登录）、`POST /api/newspaper/generate`（管理员，异步）
+- 调试：`node dist/scripts/newspaper-daily.js --dry-run` 只采集不调用 AI；`--no-ai` 直接用原始素材出一期
 
 ## 约定
 
