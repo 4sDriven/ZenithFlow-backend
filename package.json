@@ -19,6 +19,7 @@
     "@fastify/jwt": "^10.2.2",
     "@fastify/multipart": "^10.1.1",
     "bcryptjs": "^3.0.3",
+    "cheerio": "^1.1.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.12.4",
