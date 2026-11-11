@@ -141,6 +141,13 @@ export function titleFromUrl(site: SiteInfo, pageUrl: URL): string {
   const articlePath = site.articlePath || '/wiki/$1'
   const prefix = articlePath.replace(/\$1.*$/, '')
 
+  // 站点根（/）或语言根（/zh）都指向主页，不能把语言前缀当成条目名
+  const scriptPath = (site.scriptPath || '').replace(/\/+$/, '')
+  const normalized = pathname.replace(/\/+$/, '')
+  if (normalized === '' || normalized === scriptPath) {
+    return site.mainPage
+  }
+
   if (prefix && pathname.startsWith(prefix)) {
     const rest = pathname.slice(prefix.length)
     if (rest) return decodeSegment(rest).replace(/[?#].*$/, '')

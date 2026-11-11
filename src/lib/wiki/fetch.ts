@@ -9,11 +9,17 @@ const BROWSER_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 
 /**
- * 先用 curl 自己的 UA：Cloudflare 对“浏览器 UA + 非浏览器 TLS 指纹”会下发
- * 大体积 challenge（连 --max-filesize 都会直接中止），诚实声明 curl 反而放行。
- * 被 403 / 429 / 503 拒绝时再退回浏览器 UA。
+ * Cloudflare 的判定很看 UA：
+ * - 浏览器 UA + 非浏览器 TLS 指纹 → 下发大体积 challenge
+ * - 已知的 curl UA → 直接 429 限流
+ * - 自定义的诚实 UA → 正常放行
+ * 所以优先用自家 UA，被拒再依次退回 curl / 浏览器。
  */
-const USER_AGENTS = ['curl/7.61.1', BROWSER_USER_AGENT]
+const USER_AGENTS = [
+  'ZenithFlowWikiReader/1.0',
+  'curl/7.61.1',
+  BROWSER_USER_AGENT,
+]
 
 /** wiki.gg 等站点会按 TLS 指纹拦截 Node 原生 fetch，这里统一走 curl */
 const CURL_BIN = ['/usr/bin/curl', '/bin/curl', '/usr/local/bin/curl'].find((path) =>
@@ -219,6 +225,8 @@ export async function fetchRaw(input: URL, options: FetchOptions = {}): Promise<
 
     for (let uaIndex = 1; uaIndex < USER_AGENTS.length; uaIndex += 1) {
       if (!isChallengeResponse(result)) break
+      // 给限流一点点冷却时间，再换身份重试
+      await new Promise((resolve) => setTimeout(resolve, 250))
       result = await curlOnce(current, {
         timeoutMs,
         maxBytes,
