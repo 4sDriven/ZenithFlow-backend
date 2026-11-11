@@ -80,9 +80,11 @@ export async function getNewspaperView(): Promise<NewspaperView> {
   const error =
     todayRow?.status === 'failed'
       ? todayRow.error || '今日报纸生成失败'
-      : staleGenerating
-        ? '上次生成中断，可点击重新生成'
-        : null
+      : todayRow?.status === 'ready' && todayRow.error
+        ? todayRow.error
+        : staleGenerating
+          ? '上次生成中断，可点击重新生成'
+          : null
 
   return {
     ok: true,
