@@ -60,6 +60,14 @@ function looksLikeMediaWiki(html: string): boolean {
   )
 }
 
+/** Cloudflare 挑战只会拦 HTML 页面，MediaWiki 的 api.php 通常还能直连 */
+function isHtmlBlocked(error: unknown): boolean {
+  return (
+    error instanceof WikiFetchError &&
+    (error.status === 403 || error.status === 429 || error.status === 503)
+  )
+}
+
 function mapError(error: unknown): WikiError {
   if (error instanceof WikiError) return error
 
@@ -103,16 +111,33 @@ export async function readWikiPage(input: string): Promise<WikiPageView> {
     const cached = viewCache.get(cacheKey)
     if (cached) return { ...cached, cached: true }
 
-    const { html, finalUrl } = await fetchHtml(pageUrl, {
-      timeoutMs: 30_000,
-      maxBytes: 8 * 1024 * 1024,
-    })
+    let html = ''
+    let finalUrl = pageUrl
+    let htmlBlocked: unknown = null
+
+    try {
+      const fetched = await fetchHtml(pageUrl, {
+        timeoutMs: 30_000,
+        maxBytes: 8 * 1024 * 1024,
+      })
+      html = fetched.html
+      finalUrl = fetched.finalUrl
+    } catch (error) {
+      // HTML 被 Cloudflare 拦住时不要直接放弃：zh.minecraft.wiki 这类站点的
+      // api.php 仍然可以直连，稍后改走 MediaWiki API。
+      if (!isHtmlBlocked(error)) throw error
+      htmlBlocked = error
+    }
 
     let view: Omit<WikiPageView, 'cached'>
 
-    if (looksLikeMediaWiki(html)) {
+    if (htmlBlocked || looksLikeMediaWiki(html)) {
       const site = await resolveSite(finalUrl)
-      if (!site) throw new WikiError('没有找到该站点的 MediaWiki 接口', 'upstream', 502)
+      if (!site) {
+        // 不是 MediaWiki，或者 API 也被拦：把原始的拦截错误抛出去
+        if (htmlBlocked) throw htmlBlocked
+        throw new WikiError('没有找到该站点的 MediaWiki 接口', 'upstream', 502)
+      }
 
       const title = titleFromUrl(site, finalUrl)
       const parsed = await parseWikiPage(site, title)
