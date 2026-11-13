@@ -101,6 +101,7 @@ function mapError(error: unknown): WikiError {
 /**
  * 读取一个 wiki 页面并清洗成纯文字版。
  * 先抓一次 HTML 判断站点类型：MediaWiki → 走 API 拿正文；其他站点 → 直接在这份 HTML 上做正文提取。
+ * HTML 被 Cloudflare 挑战拦截时跳过判断，直接尝试站点探测 + API（zh.minecraft.wiki 属此类）。
  */
 export async function readWikiPage(input: string): Promise<WikiPageView> {
   try {
