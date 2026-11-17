@@ -10,8 +10,9 @@ const envSchema = z.object({
   BILI_TOKEN_SECRET: z.string().min(16),
   DASHSCOPE_API_KEY: z.string().min(1),
   DASHSCOPE_BASE_URL: z.string().default('https://dashscope.aliyuncs.com'),
-  // 文本生成首选渠道；deepseek 需要 DEEPSEEK_API_KEY，缺失时自动退回百炼
-  TEXT_PROVIDER: z.enum(['deepseek', 'dashscope']).default('deepseek'),
+  // 文本生成首选渠道。默认百炼 qwen-plus：存量任务（摘要 / RAG 问答 / 结构化 JSON）够用且单价最低
+  // 需要更强推理时改成 deepseek（需 DEEPSEEK_API_KEY）；另一渠道始终作为兜底
+  TEXT_PROVIDER: z.enum(['deepseek', 'dashscope']).default('dashscope'),
   DEEPSEEK_API_KEY: z.string().optional(),
   DEEPSEEK_BASE_URL: z.string().default('https://api.deepseek.com'),
   DEEPSEEK_MODEL: z.string().default('deepseek-flash'),
