@@ -34,7 +34,15 @@ Node 20 + Fastify + TypeScript + Zod。
 
 ## 环境变量
 
-以 `src/config.ts` 为准：`NODE_ENV`、`HOST`、`PORT`、`DATABASE_URL`、`JWT_SECRET`、`BILI_TOKEN_SECRET`、`DASHSCOPE_API_KEY`、`DASHSCOPE_BASE_URL`、`MEDIA_DIR`、`PUBLIC_BASE_URL`、`FFMPEG_PATH`、`FFPROBE_PATH`、`QIANWEN_CLI_PATH`。
+以 `src/config.ts` 为准：`NODE_ENV`、`HOST`、`PORT`、`DATABASE_URL`、`JWT_SECRET`、`BILI_TOKEN_SECRET`、`DASHSCOPE_API_KEY`、`DASHSCOPE_BASE_URL`、`TEXT_PROVIDER`、`DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`、`MEDIA_DIR`、`PUBLIC_BASE_URL`、`FFMPEG_PATH`、`FFPROBE_PATH`、`QIANWEN_CLI_PATH`。
+
+## 文本模型渠道（`lib/text.ts`）
+
+- 纯文本生成（分镜脚本、知识库问答、日报）统一走 `chatText()`，视频 / 语音 / 向量 / 重排仍走百炼
+- `TEXT_PROVIDER` 选主渠道（默认 `deepseek` 官方，`deepseek-flash`），另一个渠道自动作为兜底；主渠道失败会 `console.warn` 后退回
+- DeepSeek 官方默认开启思考模式，`chatText()` 显式传 `thinking: { type: 'disabled' }`，否则 `max_tokens` 会被思维链吃掉、JSON 出不来
+- 缺 `DEEPSEEK_API_KEY` 时自动只用百炼，不会报错
+
 
 - 密钥只放 `.env`（600）或环境变量，禁止入库 / 提交
 - 媒体目录默认 `/var/lib/zenithflow/media`

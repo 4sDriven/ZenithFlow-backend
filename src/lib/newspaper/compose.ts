@@ -1,4 +1,3 @@
-import { config } from '../../config.js'
 import type {
   NewspaperItem,
   NewspaperItemKind,
@@ -8,9 +7,8 @@ import type {
 } from './types.js'
 import { SECTION_KEYS, SECTION_META } from './types.js'
 import { clip, normalizeTitle, stripHtml } from './http.js'
+import { chatText } from '../text.js'
 
-const BASE = config.DASHSCOPE_BASE_URL.replace(/\/$/, '')
-const MODEL = 'qwen-plus'
 const MAX_PROMPT_ITEMS = 55
 
 function extractJson(text: string): unknown {
@@ -215,33 +213,7 @@ ${lines}
 }
 
 async function callQwen(system: string, user: string): Promise<unknown> {
-  const response = await fetch(`${BASE}/compatible-mode/v1/chat/completions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${config.DASHSCOPE_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-      temperature: 0.4,
-      max_tokens: 1600,
-    }),
-    signal: AbortSignal.timeout(90_000),
-  })
-
-  if (!response.ok) {
-    const text = await response.text()
-    throw new Error(`模型调用失败 (${response.status}) ${text.slice(0, 160)}`)
-  }
-
-  const data = (await response.json()) as {
-    choices?: { message?: { content?: string } }[]
-  }
-  const content = data.choices?.[0]?.message?.content ?? ''
+  const content = await chatText({ system, user, temperature: 0.4, maxTokens: 1600 })
   return extractJson(content)
 }
 

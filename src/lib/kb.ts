@@ -1,6 +1,4 @@
-import { config } from '../config.js'
-
-const base = config.DASHSCOPE_BASE_URL.replace(/\/$/, '')
+import { chatText } from './text.js'
 
 export function chunkText(text: string, size = 600, overlap = 80): string[] {
   const clean = text.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
@@ -119,32 +117,5 @@ export async function answerWithContext(params: {
     '你是个人知识库助手。只依据用户提供的「资料」回答问题，资料中没有的信息不要编造。用简体中文简洁准确地回答。引用资料时在句末用 [1][2] 标注对应资料编号。'
   const user = `资料：\n${contextText}\n\n问题：${question}`
 
-  const res = await fetch(`${base}/compatible-mode/v1/chat/completions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${config.DASHSCOPE_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'qwen-plus',
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-      temperature: 0.3,
-    }),
-  })
-
-  const data = (await res.json()) as {
-    choices?: { message?: { content?: string } }[]
-    code?: string
-    message?: string
-  }
-
-  const content = data.choices?.[0]?.message?.content
-  if (!res.ok || !content) {
-    throw new Error(`问答失败 (${data.code ?? res.status}) ${data.message ?? ''}`)
-  }
-
-  return content
+  return chatText({ system, user, temperature: 0.3 })
 }

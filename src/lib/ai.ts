@@ -1,4 +1,5 @@
 import { config } from '../config.js'
+import { chatText } from './text.js'
 
 const base = config.DASHSCOPE_BASE_URL.replace(/\/$/, '')
 
@@ -47,28 +48,7 @@ export async function generateScript(params: {
 请严格输出如下 JSON 结构（不要改动字段名）：
 {"title":"视频标题","shots":[{"description":"画面描述：包含镜头/场景/主体动作，将直接用作文生视频提示词","narration":"该镜的旁白或台词（可留空）","duration":单个镜头秒数}]}`
 
-  const res = await fetch(`${base}/compatible-mode/v1/chat/completions`, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify({
-      model: 'qwen-plus',
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-      temperature: 0.8,
-    }),
-  })
-
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error(`脚本生成失败 (${res.status}) ${text.slice(0, 200)}`)
-  }
-
-  const data = (await res.json()) as {
-    choices?: { message?: { content?: string } }[]
-  }
-  const content = data.choices?.[0]?.message?.content ?? ''
+  const content = await chatText({ system, user, temperature: 0.8 })
   const parsed = extractJson(content) as GeneratedScript
 
   if (!parsed?.shots?.length) {
