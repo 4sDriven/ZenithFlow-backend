@@ -16,6 +16,11 @@ const envSchema = z.object({
   DEEPSEEK_API_KEY: z.string().optional(),
   DEEPSEEK_BASE_URL: z.string().default('https://api.deepseek.com'),
   DEEPSEEK_MODEL: z.string().default('deepseek-flash'),
+  // 网易云开放平台（AI 推荐歌单）：应用私钥 base64 单行，避免多行 PEM 进 env
+  NETEASE_APP_ID: z.string().default('b3010d000000000049b0c40abe75f542'),
+  NETEASE_APP_KEY_B64: z.string().default(''),
+  NETEASE_DEVICE_ID: z.string().default('ncmcli_553f7cab207264dbfa7da9d9'),
+  NETEASE_CLIENT_IP: z.string().default('127.0.0.1'),
   MEDIA_DIR: z.string().default('/var/lib/zenithflow/media'),
   PUBLIC_BASE_URL: z.string().default('http://47.238.148.245'),
   FFMPEG_PATH: z.string().default('/opt/zenithflow/bin/ffmpeg'),

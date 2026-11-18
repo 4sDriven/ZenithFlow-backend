@@ -31,10 +31,11 @@ Node 20 + Fastify + TypeScript + Zod。
 | `/api/english` | `routes/english.ts` | 英语口语 |
 | `/api/bili` | `routes/bili.ts` | B站视频搜索、UP 主搜索 / 投稿、评论、子评论、讨论关系、点赞 / 回复、扫码登录绑定 |
 | `/api/newspaper` | `routes/newspaper.ts` | 每日报纸：今日一期、管理员手动重新生成 |
+| `/api/music` | `routes/music.ts` | AI 今日歌单（admin）：登录状态、扫码登录、生成、进度、上次结果 |
 
 ## 环境变量
 
-以 `src/config.ts` 为准：`NODE_ENV`、`HOST`、`PORT`、`DATABASE_URL`、`JWT_SECRET`、`BILI_TOKEN_SECRET`、`DASHSCOPE_API_KEY`、`DASHSCOPE_BASE_URL`、`TEXT_PROVIDER`、`DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`、`MEDIA_DIR`、`PUBLIC_BASE_URL`、`FFMPEG_PATH`、`FFPROBE_PATH`、`QIANWEN_CLI_PATH`。
+以 `src/config.ts` 为准：`NODE_ENV`、`HOST`、`PORT`、`DATABASE_URL`、`JWT_SECRET`、`BILI_TOKEN_SECRET`、`DASHSCOPE_API_KEY`、`DASHSCOPE_BASE_URL`、`TEXT_PROVIDER`、`DEEPSEEK_API_KEY`、`DEEPSEEK_BASE_URL`、`DEEPSEEK_MODEL`、`NETEASE_APP_ID`、`NETEASE_APP_KEY_B64`、`NETEASE_DEVICE_ID`、`NETEASE_CLIENT_IP`、`MEDIA_DIR`、`PUBLIC_BASE_URL`、`FFMPEG_PATH`、`FFPROBE_PATH`、`QIANWEN_CLI_PATH`。
 
 ## 文本模型渠道（`lib/text.ts`）
 
@@ -58,6 +59,9 @@ PostgreSQL 12 + Drizzle ORM，连接在 `src/db/client.ts`，表定义在 `src/d
 - `english_series` / `english_episodes` / `english_assignments`：英语素材与每日作业
 - `bili_accounts`：站点账号绑定的 B 站登录态（`user_id` 唯一），Cookie / refresh_token 用 AES-256-GCM 加密
 - `newspaper_editions`：每日报纸（`edition_date` 唯一、状态、六个版块 JSON、来源统计），只保留最新一期
+- `music_accounts`：网易云授权（单账号，`access_token` 用 AES-256-GCM 加密，记录过期时间与昵称）
+- `music_playlists`：本模块创建/接管的歌单（白名单，只允许操作这里的 `netease_playlist_id`）
+- `music_tracks`：每次生成的曲目（`generation_id` + `position`），用于展示与 7 天去重
 
 迁移与种子见 `src/db/`、`src/scripts/`。
 
@@ -88,6 +92,19 @@ PostgreSQL 12 + Drizzle ORM，连接在 `src/db/client.ts`，表定义在 `src/d
 - 写操作只在 412 / -412 / -352（请求未执行）时退避重试一次；网络超时等不确定结果**不重试**，避免重复发评论
 - `writeCodeToMessage()` 统一把 B 站错误码（-101/-111/12002/12015/12025/12051 等）翻译成中文；回复成功后 `invalidateBiliCommentCache(aid)` 清掉该视频的评论/子评论/页数/关系图缓存
 - 写接口只使用当前站点账号自己绑定的 B 站登录态，不接受前端传账号；未绑定返回 409，登录过期/凭据损坏返回 401
+
+## AI 今日歌单模块（`lib/netease/`）
+
+- 仅 admin；不做定时任务，由页面按钮手动触发，生成过程异步（进度在 `getJob()` 内存状态里，前端每 2.5s 轮询）
+- 登录：自实现开放平台签名（`client.ts`），不依赖 `ncm-cli` 运行时；`POST /api/music/login/qr` → `GET /api/music/login/poll?key=` 页内二维码
+  - 二维码链路：`oauth2/login/anonymous`（匿名 token）→ `user/oauth2/qrcodekey/get/v2`（`{type:2,expiredKey:'300'}`）→ `oauth2/device/login/qrcode/get` 轮询（801 等待 / 802 已扫码 / 800 过期）
+  - **没有 refresh 接口**（多个候选路径 404），token 24h 过期后只能重新扫码；失效时 `/api/music/status` 返回 `needLogin`
+- 签名：`accessToken/appId/bizContent/device/signType/timestamp` 按字母序拼 `k=v&k=v`，`base64(RSA-SHA256(私钥, 原文))`；六个参数 + sign 全放 query，业务参数只放 `bizContent`
+- 生成策略：红心所在专辑 → 全专辑曲目 − 已红心 − 听歌排行 − 最近播放 − 7 天内推荐过 − Live/Demo/Remaster − interlude（<90s 或名字命中）→ 深度曲目（约 60%）；`chatText()` 出「陌生艺人 + 歌名 + 理由」→ 逐首搜索校验（约 40%）
+- 歌单：复用同一个 `AI 今日推荐`（`music_playlists` 单行），每次清空重填；首次运行会接管账号里名字匹配 `^AI\s*(推荐|今日推荐)` 的旧歌单，避免留孤儿
+- 写入：`playlist/song/batch/like` 是**往头部追加**，按倒序写入使最终顺序等于列表顺序；写入后核对 `trackCount` 并更新歌单简介
+- 删除歌单没有官方接口；用户手删后下次生成会自动重建
+- 接口坑：`search/song/get/v3` 必须同时传 `keyword/limit/offset`；`album/song/list/get/v2` 的 `duration` 可用但 `album/detail/get/v2` 不返回曲目；`query/song/record/get` 是听歌排行（总榜 100 条）
 
 ## 日报模块（`lib/newspaper/`）
 

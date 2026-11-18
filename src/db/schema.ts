@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -263,3 +264,58 @@ export const newspaperEditions = pgTable('newspaper_editions', {
 })
 
 export type NewspaperEditionRow = typeof newspaperEditions.$inferSelect
+
+/** 网易云账号（单账号：整个站点只用一份授权） */
+export const musicAccounts = pgTable(
+  'music_accounts',
+  {
+    id: serial('id').primaryKey(),
+    singletonKey: varchar('singleton_key', { length: 32 }).notNull().default('default'),
+    neteaseUid: varchar('netease_uid', { length: 64 }),
+    nickname: varchar('nickname', { length: 128 }).notNull().default(''),
+    accessTokenEnc: text('access_token_enc').notNull(),
+    expireAt: timestamp('expire_at', { withTimezone: true }),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex('music_accounts_singleton_uq').on(table.singletonKey)],
+)
+
+export type MusicAccountRow = typeof musicAccounts.$inferSelect
+
+/** 本模块自己创建的歌单（白名单，只允许操作这里的 ID） */
+export const musicPlaylists = pgTable('music_playlists', {
+  id: serial('id').primaryKey(),
+  neteasePlaylistId: varchar('netease_playlist_id', { length: 64 }).notNull().unique(),
+  originalId: varchar('original_id', { length: 64 }),
+  name: varchar('name', { length: 200 }).notNull(),
+  lastGeneratedAt: timestamp('last_generated_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export type MusicPlaylistRow = typeof musicPlaylists.$inferSelect
+
+export type MusicTrackSource = 'deep' | 'new'
+
+/** 每次生成的曲目，用于展示与「N 天内不重复推荐」 */
+export const musicTracks = pgTable(
+  'music_tracks',
+  {
+    id: serial('id').primaryKey(),
+    playlistRowId: integer('playlist_row_id')
+      .notNull()
+      .references(() => musicPlaylists.id, { onDelete: 'cascade' }),
+    generationId: varchar('generation_id', { length: 40 }).notNull(),
+    songId: varchar('song_id', { length: 64 }).notNull(),
+    originalId: varchar('original_id', { length: 64 }),
+    name: varchar('name', { length: 300 }).notNull(),
+    artists: varchar('artists', { length: 300 }).notNull().default(''),
+    album: varchar('album', { length: 300 }),
+    reason: text('reason'),
+    source: varchar('source', { length: 16 }).notNull().$type<MusicTrackSource>(),
+    position: integer('position').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('music_tracks_created_idx').on(table.createdAt)],
+)
+
+export type MusicTrackRow = typeof musicTracks.$inferSelect

@@ -12,6 +12,7 @@ import { englishRoutes } from './routes/english.js'
 import { biliRoutes } from './routes/bili.js'
 import { newspaperRoutes } from './routes/newspaper.js'
 import { wikiRoutes } from './routes/wiki.js'
+import { musicRoutes } from './routes/music.js'
 
 export async function buildApp() {
   const app = Fastify({
@@ -32,6 +33,7 @@ export async function buildApp() {
   await app.register(biliRoutes, { prefix: '/api' })
   await app.register(newspaperRoutes, { prefix: '/api' })
   await app.register(wikiRoutes, { prefix: '/api' })
+  await app.register(musicRoutes, { prefix: '/api' })
 
   return app
 }
