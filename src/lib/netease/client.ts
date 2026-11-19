@@ -31,7 +31,13 @@ const DEVICE = JSON.stringify({
 
 export const NETEASE_APP_ID = APP_ID
 
-/** 业务错误码：1408 = token 失效（官方文案是「账户已封禁或注销」），2509 = 缺 accessToken */
+/**
+ * 业务错误码：
+ * - 1406 = accessToken 过期（官方文案「accessToken过期，请重新授权登录」，24h 到期即返回）
+ * - 1408 = token 失效（官方文案是「账户已封禁或注销」）
+ * - 2509 = 缺 accessToken
+ * - 301 = 未授权
+ */
 export class NeteaseError extends Error {
   code: number
 
@@ -42,7 +48,7 @@ export class NeteaseError extends Error {
   }
 
   get isAuthError(): boolean {
-    return this.code === 1408 || this.code === 2509 || this.code === 301
+    return this.code === 1406 || this.code === 1408 || this.code === 2509 || this.code === 301
   }
 }
 
